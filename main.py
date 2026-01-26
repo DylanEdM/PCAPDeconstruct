@@ -1,6 +1,6 @@
 from datetime import datetime,timezone,timedelta
-import linklayer
-class Packet:
+from definitions import *
+class PacketRecord:
     class PacketHeader:
         def __init__(self, header_binary):
             epoch_time = int(header_binary[0:4][::global_header[0]].hex(), 16)
@@ -12,13 +12,21 @@ class Packet:
             self.timestamp = f'{self.datetime}.{self.nano_seconds}Z GMT'
             self.cap_len = int(header_binary[8:12][::global_header[0]].hex(), 16)
             self.org_len = int(header_binary[12:16][::global_header[0]].hex(), 16)
-            self.total_len = self.cap_len + 16
+
     class PacketData:
         def __init__(self, packet_data):
+            self.eth = Ethernet(packet_data)
+            self.IP4 = IP4(self.eth.payload)
+            self.UDP = UDP(self.IP4.data)
+            self.DHCP = DHCP(self.UDP.payload,global_header[0])
             pass
+
     def __init__(self,packet_record):
         self.packet_header = self.PacketHeader(packet_record[0:16])
-        self.packet_data = self.PacketData(packet_record[16:])
+        self.total_len = self.packet_header.cap_len + 16
+        packet_binary = packet_record[16:self.total_len]
+        self.packet_data = self.PacketData(packet_binary)
+
 def global_header(header_binary):
     try:
         endianness = 0
@@ -37,7 +45,7 @@ def global_header(header_binary):
         if major_version != '2' or minor_version != '4':
             raise TypeError(f'Unsupported file version {major_version}.{minor_version}: Unable to parse file')
         snap_len = int(header_binary[16:20][::endianness].hex(), 16)
-        link_type = linklayer.shortName(int(header_binary[20:22][::endianness].hex(), 16))
+        link_type = LinkDef(int(header_binary[20:22][::endianness].hex(), 16))
         return endianness, magic_number, major_version, minor_version, snap_len, link_type
     except ValueError as e:
         print(e)
@@ -51,7 +59,10 @@ if __name__ == "__main__":
     global_header = global_header(binary[0:24])
     current_pos = 24
     packets = []
+    '''
     while current_pos < len(binary):
-        packets.append(Packet(binary[current_pos:]))
-        current_pos += packets[-1].packet_header.total_len
+        packets.append(PacketRecord(binary[current_pos:]))
+        current_pos += packets[-1].total_len
+    '''
+    packets.append(PacketRecord(binary[current_pos:]))
     pass
