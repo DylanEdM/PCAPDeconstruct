@@ -53,16 +53,21 @@ def global_header(header_binary):
         print(e)
 
 if __name__ == "__main__":
-    _endianness = {-1:'little', 1: 'big'}
+    _endianness = {-1:'Little', 1: 'Big'}
     with open("./ExamplePCAPs/CyberSecurity2026.pcap",'rb') as cap:
         binary = cap.read() #read in binary
     global_header = global_header(binary[0:24])
     current_pos = 24
     packets = []
-    '''
     while current_pos < len(binary):
         packets.append(PacketRecord(binary[current_pos:]))
         current_pos += packets[-1].total_len
-    '''
-    packets.append(PacketRecord(binary[current_pos:]))
-    pass
+        packet = packets[-1]
+        print(f"Global Header Length: 24 Octets\\Bytes")
+        print(f"Magic Number: {global_header[1]}")
+        print(f"Endianness: {_endianness[global_header[0]]}")
+        print(f"Major Version: {global_header[2]}")
+        print(f"Minor Version: {global_header[3]}")
+        print(f"Snap Length: {global_header[4]} Bytes")
+        print(f"Data Link Type: {global_header[5].short_name}")
+        break

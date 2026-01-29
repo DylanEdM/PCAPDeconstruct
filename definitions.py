@@ -2,8 +2,8 @@ class LinkDef:
     def __init__(self,data):
         #<LinkTypeName>, <LinkTypeValue>, <LinkTypeShortName>
         self.link_types = [('LINKTYPE_NULL', 0, 'null'),
-                        ('LINKTYPE_ETHERNET', 1, 'ethernet'),
-                        ('LINKTYPE_TOKEN_RING', 6, 'token ring'),
+                        ('LINKTYPE_ETHERNET', 1, 'Ethernet'),
+                        ('LINKTYPE_TOKEN_RING', 6, 'Token Ring'),
                         ('LINKTYPE_ARCNET', 7, 'ARCnet'),
                         ('LINKTYPE_SLIP', 8, 'SLIP')]
         self.short_name = self.short_name(data)
