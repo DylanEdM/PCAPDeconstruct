@@ -12,6 +12,9 @@ class PacketRecord:
             self.timestamp = f'{self.datetime}.{self.nano_seconds}Z GMT'
             self.cap_len = int(header_binary[8:12][::global_header.endianness].hex(), 16)
             self.org_len = int(header_binary[12:16][::global_header.endianness].hex(), 16)
+        def print_header(self):
+            print(f"Date & Time of Packet: {self.timestamp}")
+            print(f"{self.cap_len} bytes captured of original {self.org_len} bytes")
 
     class PacketData:
         def __init__(self, packet_data):
@@ -20,12 +23,26 @@ class PacketRecord:
             self.UDP = UDP(self.IP4.data)
             self.DHCP = DHCP(self.UDP.payload,global_header.endianness)
             pass
+        def print_information(self):
+            print("Ethernet Information:")
+            self.eth.print_info()
+            print("IP4 Information:")
+            self.IP4.print_info()
+            print("UDP Information:")
+            self.UDP.print_info()
+            print("DHCP Information:")
+            self.DHCP.print_info()
 
     def __init__(self,packet_record):
         self.packet_header = self.PacketHeader(packet_record[0:16])
         self.total_len = self.packet_header.cap_len + 16
         packet_binary = packet_record[16:self.total_len]
         self.packet_data = self.PacketData(packet_binary)
+    def print_info(self):
+        print("Packet Header Information:")
+        self.packet_header.print_header()
+        print("Packet Data Information:")
+        self.packet_data.print_information()
 class GlobalHeader:
     def __init__(self,header_binary):
         try:
@@ -70,4 +87,6 @@ if __name__ == "__main__":
     while current_pos < len(binary):
         packets.append(PacketRecord(binary[current_pos:]))
         current_pos += packets[-1].total_len
+        print(f"\nPacket: {len(packets)}")
+        packets[-1].print_info()
         break
