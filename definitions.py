@@ -82,16 +82,23 @@ class Ethernet:
 class DHCP:
     class __option:
         def __init__(self,data):
-            if data.hex() != 'ff':
-                self.length = data[1]
-                self.info = data[2:data[1]+2].hex()
-            else:
-                self.length = 0
-                self.info = data[0]
+                self.code = int(data[0:1].hex(),16)
+                match self.code:
+                    case 255:
+                        self.length = 0
+                        self.info = None
+                    case 81:
+                        self.length = data[1]
+                        self.info = str(data[2:data[1] + 2][3::])[2::].rstrip("'")
+                    case _:
+                        self.length = data[1]
+                        self.info = data[2:data[1]+2].hex()
         def print_info(self):
+            print(f"Option Code: {self.code}")
             print(f"Length: {self.length}")
             print(f"Info: 0x{self.info}")
     def __init__(self,data: bytes,endianness):
+        self.length = len(data)
         self.op = int(data[0:1].hex(),16)
         self.h_type = LinkDef(int(data[1:2].hex(),16)).short_name
         self.h_len = int(data[2:3].hex(),16)
@@ -115,6 +122,7 @@ class DHCP:
             i += self.options[-1].length+2
     def print_info(self):
         ops = {1:"BOOTREQUEST",2:"BOOTREPLY"}
+        print(f"DHCP Length:  {self.length}")
         print(f"Option: {self.op} ({ops[self.op]})")
         print(f"Hardware Type: {self.h_type}")
         print(f"Hardware Address Length: {self.h_len}")
@@ -137,7 +145,6 @@ class DHCP:
         else:
             print(f"Boot file name: {self.file}")
         print(f"Magic cookie: {self.magicCookie} (DHCP)")
-        for i, op in enumerate(self.options):
-            print(f"\nOption: {i}")
+        for op in self.options:
             op.print_info()
-        print("\n")
+            print("\n")

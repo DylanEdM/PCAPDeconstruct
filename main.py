@@ -89,4 +89,6 @@ if __name__ == "__main__":
         current_pos += packets[-1].total_len
         print(f"\nPacket: {len(packets)}")
         packets[-1].print_info()
+        for op in packets[-1].packet_data.DHCP.options:
+            if op.code == 81: print(f"Host PC name: {op.info}")
         break
