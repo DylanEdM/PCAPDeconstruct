@@ -18,11 +18,22 @@ class PacketRecord:
 
     class PacketData:
         def __init__(self, packet_data):
-            self.eth = Ethernet(packet_data)
-            self.IP4 = IP4(self.eth.payload)
-            self.UDP = UDP(self.IP4.data)
-            self.DHCP = DHCP(self.UDP.payload,global_header.endianness)
-            pass
+            try:
+                self.eth = Ethernet(packet_data)
+                self.IP4 = IP4(self.eth.payload)
+                self.UDP = UDP(self.IP4.data)
+                self.DHCP = DHCP(self.UDP.payload,global_header.endianness)
+                self.remaining = None
+                self.raw = packet_data
+            except Exception as e:
+                if self.UDP:
+                    self.remaining = self.UDP.payload
+                elif self.IP4:
+                    self.remaining = self.IP4.data
+                elif self.eth:
+                    self.remaining = self.eth.payload
+                else:
+                    self.remaining = packet_data
         def print_information(self):
             print("Ethernet Information:")
             self.eth.print_info()
@@ -84,11 +95,33 @@ if __name__ == "__main__":
     global_header.print_header()
     current_pos = 24
     packets = []
+    #decode all packets as much as possible
     while current_pos < len(binary):
         packets.append(PacketRecord(binary[current_pos:]))
         current_pos += packets[-1].total_len
         print(f"\nPacket: {len(packets)}")
-        packets[-1].print_info()
-        for op in packets[-1].packet_data.DHCP.options:
-            if op.code == 81: print(f"Host PC name: {op.info}")
-        break
+    packets[0].print_info()
+    for op in packets[0].packet_data.DHCP.options:
+        if op.code == 81: print(f"Host PC name: {op.info}")
+    #find .top
+    labels = []
+    domain = ""
+    for packet in packets:
+        try:
+            encodedDomain = packets[5162].packet_data.UDP.payload[12:len(packets[5162].packet_data.UDP.payload)-5]
+            pointer = 0
+            while pointer < len(encodedDomain):
+                try:
+                    length = encodedDomain[pointer]+1
+                    labels.append(str(encodedDomain[pointer+1:pointer+length])[2::].rstrip("'"))
+                    pointer += length
+                except IndexError:
+                    pass
+            if labels[-1] == "top":
+                for label in labels:
+                    domain += label+"."
+                domain = domain.rstrip(".")
+            break
+        except Exception:
+            pass
+    print(f"Suspect Domain: {domain}")
