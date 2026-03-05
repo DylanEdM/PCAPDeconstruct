@@ -1,3 +1,15 @@
+class TCP:
+    def __init__(self,data):
+        self.srcPort = int(data[0:2].hex(),16)
+        self.destPort = int(data[2:4].hex(),16)
+        self.sequenceNumber = int(data[4:8].hex(),16)
+        self.acknowledgementNumber = int(data[8:12].hex(),16)
+        self.dataOffset = int(''.join(f"{byte:08b}" for byte in data[12:13])[:4],2)
+        self.data = data[20+(self.dataOffset-5)*4::]
+        self.hexData = self.data.hex()
+        self.length= len(self.data)
+        pass
+
 class LinkDef:
     def __init__(self,data):
         #<LinkTypeName>, <LinkTypeValue>, <LinkTypeShortName>
@@ -50,7 +62,7 @@ class IP4:
         self.id = data[4:6].hex()
         self.flags = data[6:8]
         self.ttl = int(data[8:9].hex(),16)
-        self.proto = data[9:10]
+        self.proto = int(data[9:10].hex(),16)
         self.checksum = data[10:12]
         self.src = [data[12],data[13],data[14],data[15]]
         self.dst = [data[16],data[17],data[18],data[19]]
@@ -148,3 +160,30 @@ class DHCP:
         for op in self.options:
             op.print_info()
             print("\n")
+
+class HTTP:
+    def __init__(self,data):
+        self.sections = data.split(b"\r\n")
+        self.searchRequest = None
+        self.host = None
+        self.contentType = None
+        self.transferEncoding = None
+        self.data = None
+        self.contentEncoding = None
+        self.referer = None
+        for sect in self.sections:
+            if sect.__contains__(b'Host:'):
+                self.host = sect.lstrip(b'Host: ').decode('ascii')
+            if sect.__contains__(b'/search?q='):
+                self.searchRequest = data[14::].split(b'&qs=')[0].decode('ascii').replace('+',' ')
+            if sect.__contains__(b'Content-Type:'):
+                self.contentType = sect.lstrip(b'Content-Type:').decode('ascii').strip()
+            if sect.__contains__(b'Content-Encoding:'):
+                self.contentEncoding = sect.lstrip(b'Content-Encoding:').decode('ascii').strip()
+            if sect.__contains__(b'Transfer-Encoding:'):
+                self.transferEncoding = sect.lstrip(b'Transfer-Encoding:').decode('utf-8').strip()
+            if sect.__contains__(b'Referer: '):
+                self.referer = sect.lstrip(b'Referer: ').decode('ascii')
+        if self.transferEncoding == "chunked":
+            self.data = self.sections[-1]
+        pass

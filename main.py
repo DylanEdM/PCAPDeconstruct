@@ -1,3 +1,4 @@
+import gzip
 from datetime import datetime,timezone,timedelta
 from definitions import *
 class PacketRecord:
@@ -21,13 +22,23 @@ class PacketRecord:
             try:
                 self.eth = Ethernet(packet_data)
                 self.IP4 = IP4(self.eth.payload)
-                self.UDP = UDP(self.IP4.data)
-                self.DHCP = DHCP(self.UDP.payload,global_header.endianness)
+                match self.IP4.proto:
+                    case 17:
+                        self.UDP = UDP(self.IP4.data)
+                        self.DHCP = DHCP(self.UDP.payload, global_header.endianness)
+                    case 6:
+                        self.TCP = TCP(self.IP4.data)
+                        if self.TCP.data.strip(b'\x00') != b'':
+                            self.HTTP = HTTP(self.TCP.data)
+                        else:
+                            self.HTTP = None
                 self.remaining = None
                 self.raw = packet_data
             except Exception as e:
                 if self.UDP:
                     self.remaining = self.UDP.payload
+                elif self.TCP:
+                    self.remaining = self.TCP.data
                 elif self.IP4:
                     self.remaining = self.IP4.data
                 elif self.eth:
@@ -104,12 +115,12 @@ if __name__ == "__main__":
     for op in packets[0].packet_data.DHCP.options:
         if op.code == 81: print(f"Host PC name: {op.info}")
     #find .top
-    labels = []
     domain = ""
     for packet in packets:
         try:
-            encodedDomain = packets[5162].packet_data.UDP.payload[12:len(packets[5162].packet_data.UDP.payload)-5]
+            encodedDomain = packet.packet_data.UDP.payload[12:len(packet.packet_data.UDP.payload)-5]
             pointer = 0
+            labels = []
             while pointer < len(encodedDomain):
                 try:
                     length = encodedDomain[pointer]+1
@@ -121,7 +132,67 @@ if __name__ == "__main__":
                 for label in labels:
                     domain += label+"."
                 domain = domain.rstrip(".")
-            break
+                break
         except Exception:
             pass
     print(f"Suspect Domain: {domain}")
+    #find search engine
+    payloadInitial = None
+    for packet in packets:
+        try:
+            if packet.packet_data.HTTP.searchRequest is not None:
+                print(f'Search Engine used: "{packet.packet_data.HTTP.host}"')
+                print(f'Search query: "{packet.packet_data.HTTP.searchRequest}"')
+                payloadInitial = packet
+            if payloadInitial.packet_data.IP4.src == packet.packet_data.IP4.dst and \
+            payloadInitial.packet_data.IP4.dst == packet.packet_data.IP4.src and \
+            payloadInitial.packet_data.TCP.srcPort == packet.packet_data.TCP.destPort and \
+            payloadInitial.packet_data.TCP.destPort == packet.packet_data.TCP.srcPort:
+                payloadStart = packet
+                break
+        except Exception:
+            pass
+    chunks = payloadStart.packet_data.TCP.data
+    chunkHexs = payloadStart.packet_data.TCP.data.hex()
+    pointer = payloadStart.packet_data.TCP.sequenceNumber + payloadStart.packet_data.TCP.length
+    counter = 0
+    for packet in packets:
+        try:
+            if packet.packet_data.TCP.sequenceNumber == pointer:
+                if packet.packet_data.TCP.length == 0:
+                    packetFinal = packet
+                    break
+                chunks += packet.packet_data.TCP.data
+                chunkHexs += packet.packet_data.TCP.data.hex()
+                pointer += packet.packet_data.TCP.length
+                counter += 1
+                pass
+        except Exception:
+            pass
+    reassembledHttp = HTTP(chunks)
+    dechunked = b''
+    chunkPointer = 0
+    for i, section in enumerate(reassembledHttp.sections):
+        if section == b'':
+            chunkPointer = i+1
+            break
+    while chunkPointer < len(reassembledHttp.sections):
+        if reassembledHttp.sections[chunkPointer] == b'0' or b'':
+            break
+        dechunked += reassembledHttp.sections[chunkPointer+1]
+        chunkPointer+=2
+    #turn dechuncked to string by using gzip
+    response = str(gzip.decompress(dechunked))
+    print(f"First result: {response[response.find("<cite>")+6:response.find("</cite>")]}")
+
+    for packet in packets:
+        try:
+            if packet.packet_data.HTTP.searchRequest.__contains__(payloadInitial.packet_data.HTTP.host):
+                if packet.packet_data.HTTP.host.__contains__(payloadInitial.packet_data.HTTP.host.lstrip("www.").rstrip(".com")):
+                    pass
+                else:
+                    print(f"User navigated to: '{packet.packet_data.HTTP.host}'")
+                    break
+        except Exception as e:
+            pass
+    pass
