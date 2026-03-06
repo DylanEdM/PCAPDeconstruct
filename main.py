@@ -1,6 +1,7 @@
 import gzip
 from datetime import datetime,timezone,timedelta
 from definitions import *
+import re
 class PacketRecord:
     class PacketHeader:
         def __init__(self, header_binary):
@@ -115,23 +116,20 @@ if __name__ == "__main__":
     for op in packets[0].packet_data.DHCP.options:
         if op.code == 81: print(f"Host PC name: {op.info}")
     #find .top
-    domain = ""
     for packet in packets:
         try:
-            encodedDomain = packet.packet_data.UDP.payload[12:len(packet.packet_data.UDP.payload)-5]
+            encodedDomain = packet.packet_data.UDP.payload[12:len(packet.packet_data.UDP.payload) - 5]
             pointer = 0
             labels = []
-            while pointer < len(encodedDomain):
-                try:
-                    length = encodedDomain[pointer]+1
-                    labels.append(str(encodedDomain[pointer+1:pointer+length])[2::].rstrip("'"))
-                    pointer += length
-                except IndexError:
-                    pass
-            if labels[-1] == "top":
-                for label in labels:
-                    domain += label+"."
-                domain = domain.rstrip(".")
+            if re.search("top$", encodedDomain.decode('ascii')):
+                while pointer < len(encodedDomain):
+                    try:
+                        length = encodedDomain[pointer] + 1
+                        labels.append(str(encodedDomain[pointer + 1:pointer + length])[2::].rstrip("'"))
+                        pointer += length
+                    except IndexError:
+                        pass
+                domain = ".".join(labels)
                 break
         except Exception:
             pass
