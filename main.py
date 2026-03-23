@@ -1,7 +1,7 @@
 import gzip
-from datetime import datetime,timezone,timedelta
 from definitions import *
 import re
+from os import system
 
 if __name__ == "__main__":
     _endianness = {-1:'Little', 1: 'Big'}
